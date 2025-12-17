@@ -1,0 +1,34 @@
+# Node
+node_modules/
+dist/
+.vite/
+
+# Java / Maven
+target/
+.classpath
+.project
+.settings/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Environment / Secrets
+.env
+.env.*
+
+# Logs
+*.log
+
+# Local Kubernetes artifacts
+*.kubeconfig
+kubeconfig*
+
+# Claude Code local settings
+.claude/
+
+# Documentation
+docs/
