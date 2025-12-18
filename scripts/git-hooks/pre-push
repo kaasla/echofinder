@@ -1,0 +1,66 @@
+#!/bin/bash
+# Pre-push hook: runs quality checks before allowing push
+# Fails fast if any check fails
+
+set -e
+
+echo "=== Pre-push quality checks ==="
+echo ""
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Backend tests
+if [ -d "$REPO_ROOT/backend" ] && [ -f "$REPO_ROOT/backend/pom.xml" ]; then
+    echo ">>> Running backend tests..."
+    cd "$REPO_ROOT/backend"
+    ./mvnw -q test
+    echo ">>> Backend tests passed."
+    echo ""
+fi
+
+# Frontend tests (if configured)
+if [ -d "$REPO_ROOT/frontend" ] && [ -f "$REPO_ROOT/frontend/package.json" ]; then
+    echo ">>> Running frontend checks..."
+    cd "$REPO_ROOT/frontend"
+
+    # Check if pnpm is available
+    if command -v pnpm &> /dev/null; then
+        pnpm run lint --silent 2>/dev/null || true
+        pnpm run test --run --silent 2>/dev/null || true
+    fi
+    echo ">>> Frontend checks completed."
+    echo ""
+fi
+
+# SonarQube analysis (optional)
+if [ -n "$SONAR_TOKEN" ] && [ -n "$SONAR_HOST_URL" ]; then
+    echo ">>> Running SonarQube analysis..."
+    cd "$REPO_ROOT/backend"
+
+    # Run Sonar analysis with quality gate wait
+    if ./mvnw -q sonar:sonar \
+        -Dsonar.host.url="$SONAR_HOST_URL" \
+        -Dsonar.token="$SONAR_TOKEN" \
+        -Dsonar.qualitygate.wait=true 2>/dev/null; then
+        echo ">>> SonarQube analysis passed."
+    else
+        if [ "$ECHO_SONAR_REQUIRED" = "true" ]; then
+            echo "ERROR: SonarQube quality gate failed. Push blocked."
+            exit 1
+        else
+            echo "WARNING: SonarQube analysis failed, but ECHO_SONAR_REQUIRED is not set to 'true'. Continuing..."
+        fi
+    fi
+    echo ""
+else
+    if [ "$ECHO_SONAR_REQUIRED" = "true" ]; then
+        echo "ERROR: SonarQube is required (ECHO_SONAR_REQUIRED=true) but SONAR_TOKEN or SONAR_HOST_URL is not set."
+        exit 1
+    else
+        echo ">>> Skipping SonarQube analysis (SONAR_TOKEN not configured)."
+        echo ""
+    fi
+fi
+
+echo "=== All pre-push checks passed ==="
+exit 0

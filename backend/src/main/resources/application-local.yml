@@ -1,0 +1,6 @@
+# Local development profile
+# Inherits from application.yml, override only what differs
+
+logging:
+  level:
+    com.echofinder: DEBUG
