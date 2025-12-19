@@ -19,20 +19,37 @@ mkdir -p "$GIT_HOOKS_DIR"
 if [ -f "$SCRIPT_DIR/commit-msg" ]; then
     cp "$SCRIPT_DIR/commit-msg" "$GIT_HOOKS_DIR/commit-msg"
     chmod +x "$GIT_HOOKS_DIR/commit-msg"
-    echo "  Installed: commit-msg"
+    echo "  Installed: commit-msg (Conventional Commits enforcement)"
+fi
+
+# Install pre-commit hook
+if [ -f "$SCRIPT_DIR/pre-commit" ]; then
+    cp "$SCRIPT_DIR/pre-commit" "$GIT_HOOKS_DIR/pre-commit"
+    chmod +x "$GIT_HOOKS_DIR/pre-commit"
+    echo "  Installed: pre-commit (lint strict mode)"
 fi
 
 # Install pre-push hook
 if [ -f "$SCRIPT_DIR/pre-push" ]; then
     cp "$SCRIPT_DIR/pre-push" "$GIT_HOOKS_DIR/pre-push"
     chmod +x "$GIT_HOOKS_DIR/pre-push"
-    echo "  Installed: pre-push"
+    echo "  Installed: pre-push (tests + build)"
 fi
 
 echo ""
-echo "Git hooks installed successfully."
+echo "Git hooks installed successfully!"
 echo ""
-echo "To verify, try an invalid commit message:"
-echo "  git commit --allow-empty -m 'bad message'"
+echo "What each hook does:"
+echo "  commit-msg  - Blocks commits without Conventional Commits format"
+echo "  pre-commit  - Blocks commits with lint errors/warnings or Spotless issues"
+echo "  pre-push    - Blocks pushes with failing tests or build errors"
 echo ""
-echo "It should be rejected with an error."
+echo "To test commit-msg hook:"
+echo "  git commit --allow-empty -m 'bad message'  # Should be rejected"
+echo "  git commit --allow-empty -m 'feat: test'   # Should succeed"
+echo ""
+echo "Environment variables:"
+echo "  SKIP_HOOKS=1 - Bypass all hooks (emergency only)"
+echo ""
+echo "To check everything before committing:"
+echo "  ./scripts/check-all.sh"
