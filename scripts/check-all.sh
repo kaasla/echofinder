@@ -38,7 +38,7 @@ if [ -d "$FRONTEND_DIR" ]; then
     fi
 
     echo "Running tests..."
-    if ! pnpm test --run; then
+    if ! pnpm test -- --run; then
         echo "FAILED: Frontend tests"
         FAILED=1
     else

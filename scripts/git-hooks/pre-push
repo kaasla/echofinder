@@ -39,7 +39,7 @@ if [ -d "$FRONTEND_DIR" ] && [ -f "$FRONTEND_DIR/package.json" ]; then
     fi
 
     echo "[pre-push] Running tests..."
-    if ! pnpm test --run; then
+    if ! pnpm test -- --run; then
         echo ""
         echo "ERROR: Frontend tests failed."
         FAILED=1
