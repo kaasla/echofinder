@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: echofinder-local
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+images:
+  - name: echofinder-backend
+    newTag: local
+  - name: echofinder-frontend
+    newTag: local
+
+labels:
+  - pairs:
+      environment: local
+    includeSelectors: false

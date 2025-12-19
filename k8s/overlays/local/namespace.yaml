@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: echofinder-local
+  labels:
+    app.kubernetes.io/name: echofinder
+    environment: local
