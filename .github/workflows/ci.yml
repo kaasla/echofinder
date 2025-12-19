@@ -87,3 +87,15 @@ jobs:
             exit 1
           fi
           echo "PR title follows Conventional Commits format."
+
+  docker:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run container smoke tests
+        run: ./scripts/ci/container-smoke.sh

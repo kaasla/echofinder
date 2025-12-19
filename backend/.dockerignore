@@ -1,0 +1,19 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Test files (we skip tests in Docker build anyway)
+src/test/
+
+# Maven wrapper jar (will be downloaded)
+.mvn/wrapper/maven-wrapper.jar
