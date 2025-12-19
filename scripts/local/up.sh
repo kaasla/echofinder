@@ -23,9 +23,16 @@ NAMESPACE="echofinder-local"
 MAX_WAIT_SECONDS=120
 POLL_INTERVAL=5
 
-# Ports for port-forwarding during smoke tests
-BACKEND_LOCAL_PORT=18080
-FRONTEND_LOCAL_PORT=18081
+# Ports for port-forwarding
+BACKEND_PORT=8080
+FRONTEND_PORT=5173
+
+# Ports for smoke tests (different to avoid conflicts)
+SMOKE_BACKEND_PORT=18080
+SMOKE_FRONTEND_PORT=18081
+
+# PID file for tracking port-forwards
+PID_FILE="$SCRIPT_DIR/.port-forward-pids"
 
 # Colors for output
 RED='\033[0;31m'
@@ -149,15 +156,27 @@ wait_for_pods() {
     done
 }
 
+kill_existing_port_forwards() {
+    if [ -f "$PID_FILE" ]; then
+        log_info "Stopping existing port-forwards..."
+        while read -r pid; do
+            if kill -0 "$pid" 2>/dev/null; then
+                kill "$pid" 2>/dev/null || true
+            fi
+        done < "$PID_FILE"
+        rm -f "$PID_FILE"
+    fi
+}
+
 run_smoke_tests() {
     log_info "Running smoke tests..."
 
     local pids=()
 
-    # Start port-forwards
-    kubectl port-forward -n "$NAMESPACE" svc/backend "$BACKEND_LOCAL_PORT:8080" >/dev/null 2>&1 &
+    # Start temporary port-forwards for smoke tests
+    kubectl port-forward -n "$NAMESPACE" svc/backend "$SMOKE_BACKEND_PORT:8080" >/dev/null 2>&1 &
     pids+=($!)
-    kubectl port-forward -n "$NAMESPACE" svc/frontend "$FRONTEND_LOCAL_PORT:80" >/dev/null 2>&1 &
+    kubectl port-forward -n "$NAMESPACE" svc/frontend "$SMOKE_FRONTEND_PORT:80" >/dev/null 2>&1 &
     pids+=($!)
 
     # Wait for port-forwards to be ready
@@ -167,8 +186,8 @@ run_smoke_tests() {
 
     # Test backend
     log_info "Testing backend /api/health..."
-    local backend_body=$(curl -s "http://localhost:$BACKEND_LOCAL_PORT/api/health" || echo "")
-    local backend_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$BACKEND_LOCAL_PORT/api/health" || echo "000")
+    local backend_body=$(curl -s "http://localhost:$SMOKE_BACKEND_PORT/api/health" || echo "")
+    local backend_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SMOKE_BACKEND_PORT/api/health" || echo "000")
 
     if [ "$backend_code" = "200" ] && echo "$backend_body" | grep -q '"status"'; then
         log_success "Backend health check passed"
@@ -179,8 +198,8 @@ run_smoke_tests() {
 
     # Test frontend
     log_info "Testing frontend /..."
-    local frontend_body=$(curl -s "http://localhost:$FRONTEND_LOCAL_PORT/" || echo "")
-    local frontend_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$FRONTEND_LOCAL_PORT/" || echo "000")
+    local frontend_body=$(curl -s "http://localhost:$SMOKE_FRONTEND_PORT/" || echo "")
+    local frontend_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$SMOKE_FRONTEND_PORT/" || echo "000")
 
     if [ "$frontend_code" = "200" ] && echo "$frontend_body" | grep -q "EchoFinder"; then
         log_success "Frontend check passed"
@@ -189,7 +208,7 @@ run_smoke_tests() {
         test_failed=1
     fi
 
-    # Clean up port-forwards
+    # Clean up smoke test port-forwards
     for pid in "${pids[@]}"; do
         kill "$pid" 2>/dev/null || true
     done
@@ -202,18 +221,42 @@ run_smoke_tests() {
     log_success "All smoke tests passed"
 }
 
+start_port_forwards() {
+    log_info "Starting port-forwards..."
+
+    # Kill any existing port-forwards first
+    kill_existing_port_forwards
+
+    # Start backend port-forward
+    kubectl port-forward -n "$NAMESPACE" svc/backend "$BACKEND_PORT:8080" >/dev/null 2>&1 &
+    local backend_pid=$!
+    echo "$backend_pid" > "$PID_FILE"
+
+    # Start frontend port-forward
+    kubectl port-forward -n "$NAMESPACE" svc/frontend "$FRONTEND_PORT:80" >/dev/null 2>&1 &
+    local frontend_pid=$!
+    echo "$frontend_pid" >> "$PID_FILE"
+
+    # Wait a moment and verify they're running
+    sleep 2
+
+    if kill -0 "$backend_pid" 2>/dev/null && kill -0 "$frontend_pid" 2>/dev/null; then
+        log_success "Port-forwards started (PIDs: $backend_pid, $frontend_pid)"
+    else
+        log_error "Failed to start port-forwards"
+        exit 1
+    fi
+}
+
 print_summary() {
     echo ""
     echo -e "${GREEN}================================================${NC}"
     echo -e "${GREEN}  EchoFinder is running on k3d!${NC}"
     echo -e "${GREEN}================================================${NC}"
     echo ""
-    echo -e "${BLUE}Access the services:${NC}"
-    echo "  Backend:  kubectl port-forward -n $NAMESPACE svc/backend 8080:8080"
-    echo "            Then visit: http://localhost:8080/api/health"
-    echo ""
-    echo "  Frontend: kubectl port-forward -n $NAMESPACE svc/frontend 5173:80"
-    echo "            Then visit: http://localhost:5173"
+    echo -e "${BLUE}Services are available at:${NC}"
+    echo "  Backend:  http://localhost:$BACKEND_PORT/api/health"
+    echo "  Frontend: http://localhost:$FRONTEND_PORT"
     echo ""
     echo -e "${BLUE}Useful commands:${NC}"
     echo "  View pods:     kubectl get pods -n $NAMESPACE"
@@ -250,6 +293,9 @@ main() {
     echo ""
 
     run_smoke_tests
+    echo ""
+
+    start_port_forwards
     echo ""
 
     print_summary

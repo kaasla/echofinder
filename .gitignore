@@ -33,3 +33,4 @@ kubeconfig*
 
 # Documentation
 docs/
+scripts/local/.port-forward-pids

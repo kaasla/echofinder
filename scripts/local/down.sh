@@ -7,7 +7,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLUSTER_NAME="echofinder"
+PID_FILE="$SCRIPT_DIR/.port-forward-pids"
 
 # Colors for output
 RED='\033[0;31m'
@@ -27,12 +29,28 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+kill_port_forwards() {
+    if [ -f "$PID_FILE" ]; then
+        log_info "Stopping port-forwards..."
+        while read -r pid; do
+            if kill -0 "$pid" 2>/dev/null; then
+                kill "$pid" 2>/dev/null || true
+            fi
+        done < "$PID_FILE"
+        rm -f "$PID_FILE"
+        log_success "Port-forwards stopped"
+    fi
+}
+
 main() {
     echo ""
     echo -e "${BLUE}================================================${NC}"
     echo -e "${BLUE}  Stopping EchoFinder${NC}"
     echo -e "${BLUE}================================================${NC}"
     echo ""
+
+    # Kill port-forwards first
+    kill_port_forwards
 
     if ! k3d cluster list 2>/dev/null | grep -q "$CLUSTER_NAME"; then
         log_info "Cluster '$CLUSTER_NAME' does not exist, nothing to do"
