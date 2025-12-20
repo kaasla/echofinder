@@ -1,4 +1,21 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: echofinder-postgres
+    environment:
+      POSTGRES_DB: echofinder
+      POSTGRES_USER: echofinder
+      POSTGRES_PASSWORD: echofinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U echofinder -d echofinder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -6,6 +23,15 @@ services:
     container_name: echofinder-backend
     ports:
       - "8080:8080"
+    environment:
+      ECHO_DB_URL: jdbc:postgresql://postgres:5432/echofinder
+      ECHO_DB_USER: echofinder
+      ECHO_DB_PASSWORD: echofinder
+      ECHO_HASH_PREFIX_SALT: ${ECHO_HASH_PREFIX_SALT:-dev-prefix-salt}
+      ECHO_HASH_SUFFIX_SALT: ${ECHO_HASH_SUFFIX_SALT:-dev-suffix-salt}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
       interval: 30s
@@ -28,3 +54,6 @@ services:
       timeout: 3s
       start_period: 5s
       retries: 3
+
+volumes:
+  postgres_data:

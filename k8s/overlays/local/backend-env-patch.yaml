@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          env:
+            - name: JAVA_OPTS
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+            - name: ECHO_DB_URL
+              value: jdbc:postgresql://postgres:5432/echofinder
+            - name: ECHO_DB_USER
+              value: echofinder
+            - name: ECHO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: db-password
+            - name: ECHO_HASH_PREFIX_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: hash-prefix-salt
+            - name: ECHO_HASH_SUFFIX_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: hash-suffix-salt

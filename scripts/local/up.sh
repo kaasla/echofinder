@@ -26,6 +26,7 @@ POLL_INTERVAL=5
 # Ports for port-forwarding
 BACKEND_PORT=8080
 FRONTEND_PORT=5173
+POSTGRES_PORT=5433  # Use 5433 to avoid conflict with local Postgres on 5432
 
 # Ports for smoke tests (different to avoid conflicts)
 SMOKE_BACKEND_PORT=18080
@@ -146,7 +147,7 @@ wait_for_pods() {
         local total_pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
         local ready_pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | awk '$2 ~ /^[0-9]+\/[0-9]+$/ { split($2, a, "/"); if (a[1] == a[2] && a[1] > 0) print }' | wc -l | tr -d ' ')
 
-        if [ "$total_pods" -ge 2 ] && [ "$ready_pods" -eq "$total_pods" ]; then
+        if [ "$total_pods" -ge 3 ] && [ "$ready_pods" -eq "$total_pods" ]; then
             log_success "All pods ready ($ready_pods/$total_pods)"
             return 0
         fi
@@ -237,11 +238,16 @@ start_port_forwards() {
     local frontend_pid=$!
     echo "$frontend_pid" >> "$PID_FILE"
 
+    # Start postgres port-forward
+    kubectl port-forward -n "$NAMESPACE" svc/postgres "$POSTGRES_PORT:5432" >/dev/null 2>&1 &
+    local postgres_pid=$!
+    echo "$postgres_pid" >> "$PID_FILE"
+
     # Wait a moment and verify they're running
     sleep 2
 
-    if kill -0 "$backend_pid" 2>/dev/null && kill -0 "$frontend_pid" 2>/dev/null; then
-        log_success "Port-forwards started (PIDs: $backend_pid, $frontend_pid)"
+    if kill -0 "$backend_pid" 2>/dev/null && kill -0 "$frontend_pid" 2>/dev/null && kill -0 "$postgres_pid" 2>/dev/null; then
+        log_success "Port-forwards started (PIDs: $backend_pid, $frontend_pid, $postgres_pid)"
     else
         log_error "Failed to start port-forwards"
         exit 1
@@ -254,13 +260,20 @@ print_summary() {
     echo -e "${GREEN}  EchoFinder is running on k3d!${NC}"
     echo -e "${GREEN}================================================${NC}"
     echo ""
-    echo -e "${BLUE}Services are available at:${NC}"
+    echo -e "${BLUE}Services:${NC}"
     echo "  Backend:  http://localhost:$BACKEND_PORT/api/health"
     echo "  Frontend: http://localhost:$FRONTEND_PORT"
+    echo ""
+    echo -e "${BLUE}Database:${NC}"
+    echo "  Host:     localhost:$POSTGRES_PORT"
+    echo "  Database: echofinder"
+    echo "  User:     echofinder"
+    echo "  Password: echofinder"
     echo ""
     echo -e "${BLUE}Useful commands:${NC}"
     echo "  View pods:     kubectl get pods -n $NAMESPACE"
     echo "  View logs:     kubectl logs -n $NAMESPACE -l app=echofinder --all-containers -f"
+    echo "  Connect DB:    psql -h localhost -p $POSTGRES_PORT -U echofinder -d echofinder"
     echo "  Stop cluster:  ./scripts/local/down.sh"
     echo ""
 }

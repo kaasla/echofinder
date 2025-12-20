@@ -6,6 +6,23 @@ spring:
   web:
     resources:
       add-mappings: false
+  datasource:
+    url: ${ECHO_DB_URL:jdbc:postgresql://localhost:5432/echofinder}
+    username: ${ECHO_DB_USER:echofinder}
+    password: ${ECHO_DB_PASSWORD:echofinder}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+echo:
+  hash:
+    prefix-salt: ${ECHO_HASH_PREFIX_SALT}
+    suffix-salt: ${ECHO_HASH_SUFFIX_SALT}
 
 server:
   port: 8080
